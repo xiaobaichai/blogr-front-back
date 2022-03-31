@@ -1,5 +1,8 @@
-const express=require('express')
+const express=require('express');
+const md5 = require('md5');
+const S_KEY='lasjkdfsoad8'
 const router =express.Router()
+
 
 // 连接数据库
 const connection =require('../db/db.js')
@@ -51,7 +54,7 @@ router.get('/api/require_id',(req,res,next)=>{
             code:0,
             data:{
                 user_id:req.session.user_id,
-                nick_name:req.session.nick_name,
+                nick_name:req.session.nickname,
                 avatar_src:req.session.avatar_src
             },
         })
@@ -230,26 +233,158 @@ router.get('/api/message_comment',(req,res,next)=>{
 })
 
 //写留言
+router.post('/api/leave_message_comment',(req,res,next)=>{
+    connection.query('insert into message_comment(message_id,content) value(?,?)',[req.query.id,req.query.content],(err,results,fields)=>{
+        if(err) return next(err)
+        res.json({
+            code:0,
+            data:results,
+            message:'OK'
+        })
+    })
+})
 
 //资源页==================================================================
 //获取所有分类的资源
+router.get('/api/source',(req,res,next)=>{
+    let source_arr=[]
+    for(var i=1;i<=2;i++){
+        connection.query('select * from source'+i,(err,results,fields)=>{
+            if(err) return next(err)
+            source_arr.push(results)
+            if(source_arr.length===2){
+                res.json({
+                    code:0,
+                    data:source_arr,
+                    message:'OK'
+                })
+            }
+        })
+    }
+})
 
 //注册登录页==============================================================
 //注册
+router.post('/api/regist',(req,res,next)=>{
+    connection.query('select * from user where user.nickname=?',[req.body.nickname],(err,results,fields)=>{
+        if(err) return next(err)
+        if(results.length===0){
+            connection.query('insert into user(nickname,password) value(?,?)',[req.body.nickname,md5(req.body.password+S_KEY)],(err,results,fields)=>{
+                if(err) return next(err)
+                res.json({
+                    code:0,
+                    message:'注册成功'
+                })
+            })
+        }
+        else{
+            return res.json({
+                code:1,
+                message:'该昵称已注册'
+            })
+        }
+    })
+})
 
 //登录
+router.post('/api/login',(req,res,next)=>{
+    connection.query('select * from user where user.nickname=?',[req.body.nickname],(err,results,fields)=>{
+        if(err) return next(err)
+        if(results.length===0){
+            res.json({
+                code:1,
+                message:'该昵称未注册'
+            })
+        } 
+        else{
+            connection.query('select * from user where user.nickname=? and user.password=?',[req.body.nickname,md5(req.body.password+S_KEY)],(err,results,fields)=>{
+                if(err) return next(err)
+                if(results.length===0){
+                    res.json({
+                        code:2,
+                        message:'密码错误'
+                    })
+                }
+                else{
+                    connection.query('select * from user where user.nickname=?',[req.body.nickname],(err,results,fields)=>{
+                        if(err) return next(err)
+                        console.log(results);
+                        req.session.user_id=results[0].id
+                        req.session.nickname=results[0].nickname
+                        req.session.avatar_src='默认路径'
+                        req.session.profile='这个人太懒了，啥都不想写'
+                        res.json({
+                            code:0,
+                            data:results[0],
+                            message:'登陆成功'
+                        })
+                    })
+                }
+            })
+        }
+    })
+})
 
 //验证码（防机器频繁注册）
 
 //用户个人中心页===========================================================
-//登陆成功时获取个人信息   或者   在cookie有效期类进入站点时获取个人信息
+//登陆成功时获取个人信息(前端请求此接口)   或者   在cookie有效期类进入站点时获取个人信息（前端请求此接口）
+router.get('/api/get_home_msg',(req,res,next)=>{
+    if(req.session.user_id){
+        res.json({
+            code:0,
+            data:{
+                nickname:req.session.nickname,
+                avatar_src:req.session.avatar_src,
+                profile:req.session.profile
+            },
+            message:'获取个人信息成功'
+        })
+    }
+})
 
+//修改头像
+
+//修改个人简介
+2
 //文章详情页===============================================================
+router.get('/api/article_detail',(req,res,next)=>{
+    connection.query('select * from article where id=?',[req.query.id],(err,results,fields)=>{
+        if(err) return next(err)
+        res.json({
+            code:0,
+            data:results,
+            message:'获取文章成功'
+        })
+    })
+})
 
+//用户查看文章
+
+//用户点赞
+
+//用户收藏
+
+//获取文章查看次数
+
+//获取点赞数
+
+//获取收藏数
 
 //搜索结果页===============================================================
 //根据关键词请求文章（预览内容）
-
+router.post('/api/search_article',(req,res,next)=>{
+    connection.query('select * from article where article.content like "%"'+'?'+'"%"',[req.body.keywords],(err,results,fields)=>{
+        if(err) return next(err)
+        console.log(req.body.keywords);
+        console.log(results);
+        res.json({
+            code:0,
+            data:results,
+            message:'搜索成功'
+        })
+    })
+})
 
 
 
