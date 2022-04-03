@@ -48,22 +48,22 @@ connection.query('SELECT 1 + 1 AS solution', function (error, results, fields) {
 
 //Nav导航条
 //根据cookie请求用户信息
-router.get('/api/require_id',(req,res,next)=>{
-    if(req.session.user_id) {
-        return res.json({
-            code:0,
-            data:{
-                user_id:req.session.user_id,
-                nick_name:req.session.nickname,
-                avatar_src:req.session.avatar_src
-            },
-        })
-    }
-    return res.json({
-        code:1,
-        message:'非法'
-    })
-})
+// router.get('/api/get_user_acount',(req,res,next)=>{
+//     if(req.session.user_id) {
+//         return res.json({
+//             code:0,
+//             data:{
+//                 user_id:req.session.user_id,
+//                 nick_name:req.session.nickname,
+//                 avatar_src:req.session.avatar_src
+//             },
+//         })
+//     }
+//     return res.json({
+//         code:1,
+//         message:'非法'
+//     })
+// })
 //关于session的坑：前提（每个用户，无论是否注册过，都会为其生成一个session元组存储在
 //session表中）
 //req.session指携带cookie的用户对应的一个session元组
@@ -94,7 +94,7 @@ router.get('/api/article_count',(req,res,next)=>{
         if(err) return next(err)
         res.json({
             code:0,
-            data:results,
+            data:results,   
             message:'OK'
         })
     })
@@ -102,7 +102,7 @@ router.get('/api/article_count',(req,res,next)=>{
 
 //按照分页获取最新文章（预览内容）
 router.get('/api/new_articles',(req,res,next)=>{
-    connection.query('select left(content,5) as pre_article from article limit 8',(err,results,fields)=>{
+    connection.query('select title,left(content,5) as pre_content from article limit 8',(err,results,fields)=>{
         if(err) return next(err)
         res.json({
             code:0,
@@ -114,7 +114,7 @@ router.get('/api/new_articles',(req,res,next)=>{
 
 //按照分页获取热门文章（预览内容）
 router.get('/api/hot_articles',(req,res,next)=>{
-    connection.query('select left(content,5) as pre_article from article order by id desc limit 8',(err,results,fields)=>{
+    connection.query('select title,left(content,5) as pre_content from article order by read_count desc limit 8',(err,results,fields)=>{
         if(err) return next(err)
         res.json({
             code:0,
@@ -125,9 +125,9 @@ router.get('/api/hot_articles',(req,res,next)=>{
 })
 
 //分类页==================================================================
-//根据分类获取文章（预览内容）
-router.get('/api/category_articles',(req,res,next)=>{
-    connection.query('select left(content,5) as article,tag from article where tag="css" limit 8',(err,results,fields)=>{
+//根据分类获取文章总数做分页
+router.get('/api/category_articles_count',(req,res,next)=>{
+    connection.query('select count(*) as count from article where tag=?',[req.query.tag],(err,results,fields)=>{
         if(err) return next(err)
         res.json({
             code:0,
@@ -135,6 +135,30 @@ router.get('/api/category_articles',(req,res,next)=>{
             message:'OK'
         })
     })
+})
+
+//根据分类获取文章（预览内容）
+router.get('/api/category_articles',(req,res,next)=>{
+    if(req.query.tag==='all'){
+        connection.query('select title,left(content,5) as pre_content,tag from article limit ?,8',[(req.query.page-1)*8],(err,results,fields)=>{
+            if(err) return next(err)
+            res.json({
+                code:0,
+                data:results,
+                message:'OK'
+            })
+        })
+    }
+    else{
+        connection.query('select title,left(content,5) as pre_content,tag from article where tag=? limit ?,8',[req.query.tag,(req.query.page-1)*8],(err,results,fields)=>{
+            if(err) return next(err)
+            res.json({
+                code:0,
+                data:results,
+                message:'OK'
+            })
+        })
+    }
 })
 
 //留言页==================================================================
@@ -152,7 +176,7 @@ router.get('/api/message_count',(req,res,next)=>{
 
 //按照分页获取最新留言
 router.get('/api/new_messages',(req,res,next)=>{
-    connection.query('select content from message order by id limit 8',(err,results,fields)=>{
+    connection.query('select content from message order by id limit ?,1',[(req.query.page-1)*8,req.query.count],(err,results,fields)=>{
         if(err) return next(err)
         res.json({
             code:0,
@@ -163,7 +187,7 @@ router.get('/api/new_messages',(req,res,next)=>{
 })
 
 //按照分页获取热门留言
-router.get('/api/hot_messages',(req,res,next)=>{
+router.get('/api/hot_message',(req,res,next)=>{
     connection.query('select content from message order by id limit 8',(err,results,fields)=>{
         if(err) return next(err)
         res.json({
@@ -174,8 +198,6 @@ router.get('/api/hot_messages',(req,res,next)=>{
     })
 })
 
-let my_id='8'
-let my_value='你好'
 //回复某个留言
 router.post('/api/request_message',(req,res,next)=>{
     connection.query('insert into message_comment(user_id,content) values(?,?)',[my_id,my_value],(err,results,fields)=>{
@@ -233,8 +255,19 @@ router.get('/api/message_comment',(req,res,next)=>{
 })
 
 //写留言
+router.post('/api/leave_message',(req,res,next)=>{
+    connection.query('insert into message(user_id,content) value(?,?)',[req.body.user_id,req.body.content],(err,results,fields)=>{
+        if(err) return next(err)
+        res.json({
+            code:0,
+            message:'添加留言成功'
+        })
+    })
+})
+
+//写留言评论
 router.post('/api/leave_message_comment',(req,res,next)=>{
-    connection.query('insert into message_comment(message_id,content) value(?,?)',[req.query.id,req.query.content],(err,results,fields)=>{
+    connection.query('insert into message_comment(message_id,content) value(?,?)',[req.body.message_id,req.body.content],(err,results,fields)=>{
         if(err) return next(err)
         res.json({
             code:0,
@@ -328,22 +361,31 @@ router.post('/api/login',(req,res,next)=>{
 //验证码（防机器频繁注册）
 
 //用户个人中心页===========================================================
-//登陆成功时获取个人信息(前端请求此接口)   或者   在cookie有效期类进入站点时获取个人信息（前端请求此接口）
-router.get('/api/get_home_msg',(req,res,next)=>{
+//登陆成功时请求此接口获取个人信息(前端请求此接口)   或者   在cookie有效期类进入站点时获取个人信息（前端请求此接口）
+router.get('/api/get_user_acount',(req,res,next)=>{
     if(req.session.user_id){
         res.json({
             code:0,
             data:{
-                nickname:req.session.nickname,
-                avatar_src:req.session.avatar_src,
-                profile:req.session.profile
+                user_id:req.session.user_id,
+                user_info:{
+                    nickname:req.session.nickname,
+                    avatar_src:req.session.avatar_src,
+                    profile:req.session.profile
+                }
             },
             message:'获取个人信息成功'
         })
     }
+    else{
+        res.json({
+            code:1,
+            message:'未登录状态'
+        })
+    }
 })
 
-//修改头像
+//上传/修改头像
 
 //修改个人简介
 2
@@ -359,13 +401,13 @@ router.get('/api/article_detail',(req,res,next)=>{
     })
 })
 
-//用户查看文章
+//用户查看文章次数+1
 
 //用户点赞
 
 //用户收藏
 
-//获取文章查看次数
+//获取文章查看次数总数
 
 //获取点赞数
 
