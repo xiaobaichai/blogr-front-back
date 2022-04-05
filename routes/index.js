@@ -75,6 +75,11 @@ connection.query('SELECT 1 + 1 AS solution', function (error, results, fields) {
 //注意不要用(req.session.id)来判断用户是否注册过，因为每个进入过
 //站点的用户都可以访问到其req.session.id。
 
+router.get('/api/testcookie',(req,res,next)=>{
+    req.session.nickname='my kim'
+    res.send('ok')
+})
+
 
 //首页==================================================================
 //获取首页轮播图
@@ -127,14 +132,26 @@ router.get('/api/hot_articles',(req,res,next)=>{
 //分类页==================================================================
 //根据分类获取文章总数做分页
 router.get('/api/category_articles_count',(req,res,next)=>{
-    connection.query('select count(*) as count from article where tag=?',[req.query.tag],(err,results,fields)=>{
-        if(err) return next(err)
-        res.json({
-            code:0,
-            data:results,
-            message:'OK'
+    if(req.query.tag==='all'){
+        connection.query('select count(*) as count from article',(err,results,fields)=>{
+            if(err) return next(err)
+            res.json({
+                code:0,
+                data:results,
+                message:'OK'
+            })
         })
-    })
+    }
+    else{
+        connection.query('select count(*) as count from article where tag=?',[req.query.tag],(err,results,fields)=>{
+            if(err) return next(err)
+            res.json({
+                code:0,
+                data:results,
+                message:'OK'
+            })
+        })
+    }
 })
 
 //根据分类获取文章（预览内容）
@@ -164,7 +181,7 @@ router.get('/api/category_articles',(req,res,next)=>{
 //留言页==================================================================
 //获取留言总数做分页加载
 router.get('/api/message_count',(req,res,next)=>{
-    connection.query('select count(*) as message_count from message limit 8',(err,results,fields)=>{
+    connection.query('select count(*) as count from message',(err,results,fields)=>{
         if(err) return next(err)
         res.json({
             code:0,
@@ -176,7 +193,7 @@ router.get('/api/message_count',(req,res,next)=>{
 
 //按照分页获取最新留言
 router.get('/api/new_messages',(req,res,next)=>{
-    connection.query('select content from message order by id limit ?,1',[(req.query.page-1)*8,req.query.count],(err,results,fields)=>{
+    connection.query('select content from message order by id limit ?,8',[(req.query.page-1)*8],(err,results,fields)=>{
         if(err) return next(err)
         res.json({
             code:0,
@@ -279,21 +296,15 @@ router.post('/api/leave_message_comment',(req,res,next)=>{
 
 //资源页==================================================================
 //获取所有分类的资源
-router.get('/api/source',(req,res,next)=>{
-    let source_arr=[]
-    for(var i=1;i<=2;i++){
-        connection.query('select * from source'+i,(err,results,fields)=>{
+router.get('/api/category_source',(req,res,next)=>{
+        connection.query('select * from source where tag=?',[req.query.category],(err,results,fields)=>{
             if(err) return next(err)
-            source_arr.push(results)
-            if(source_arr.length===2){
                 res.json({
                     code:0,
-                    data:source_arr,
+                    data:results,
                     message:'OK'
                 })
-            }
         })
-    }
 })
 
 //注册登录页==============================================================
@@ -341,14 +352,12 @@ router.post('/api/login',(req,res,next)=>{
                 else{
                     connection.query('select * from user where user.nickname=?',[req.body.nickname],(err,results,fields)=>{
                         if(err) return next(err)
-                        console.log(results);
                         req.session.user_id=results[0].id
                         req.session.nickname=results[0].nickname
                         req.session.avatar_src='默认路径'
                         req.session.profile='这个人太懒了，啥都不想写'
                         res.json({
                             code:0,
-                            data:results[0],
                             message:'登陆成功'
                         })
                     })
@@ -383,6 +392,15 @@ router.get('/api/get_user_acount',(req,res,next)=>{
             message:'未登录状态'
         })
     }
+})
+
+//登出，结束当前session会话
+router.get('/api/logout',(req,res,next)=>{
+    req.session.destroy()
+    res.json({
+        code:0,
+        message:'注销成功'
+    })
 })
 
 //上传/修改头像

@@ -7,7 +7,7 @@ const bodyParser=require('body-parser')
 //引入express-session为用户设置session
 const session =require('express-session')
 //引入express-mysql-session将为用户设置的session存储在mysql中
-const Store =require('express-mysql-session')
+const Store =require('express-mysql-session')(session)
 let options={
     host:'localhost',
     user:'root',
@@ -15,13 +15,14 @@ let options={
     port:'3306',
     database:'blogr'
 } 
+let sessionStore =new Store(options)
 app.use(session({                   //为用户设置session
-    name:'sid',
+    name:'sid9',
     secret:'sdfjlskdf.&',
     resave:false,
-    saveUninitialized:true,
-    store:new Store(options),           //session持久化
-    cookie:{maxAge:1000*3600*24}        //表示cookie过期时间
+    saveUninitialized:false,    //saveUninitialized:true是指无论有没有session cookie，每个请求都设置一个session cookie
+    store:sessionStore,           //session持久化
+    cookie:{maxAge:8000*60*24}        //表示cookie过期时间
 }))
 
 //配置body-parser中间件
