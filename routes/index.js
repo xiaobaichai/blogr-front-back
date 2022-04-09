@@ -2,10 +2,18 @@ const express=require('express');
 const md5 = require('md5');
 const S_KEY='lasjkdfsoad8'
 const router =express.Router()
+const formidable=require('formidable')
+const path=require('path')
+
+//设置默认头像地址
+const default_avatar_path='http://localhost:3000/avatar/default.jpeg'
+//设置头像上传文件夹
+const avatar_path='http://localhost:3000/avatar/'
 
 
 // 连接数据库
-const connection =require('../db/db.js')
+const connection =require('../db/db.js');
+const { log } = require('console');
 
 connection.query('SELECT 1 + 1 AS solution', function (error, results, fields) {
     if (error) throw error;
@@ -75,9 +83,18 @@ connection.query('SELECT 1 + 1 AS solution', function (error, results, fields) {
 //注意不要用(req.session.id)来判断用户是否注册过，因为每个进入过
 //站点的用户都可以访问到其req.session.id。
 
-router.get('/api/testcookie',(req,res,next)=>{
-    req.session.nickname='my kim'
-    res.send('ok')
+router.post('/api/testupload',(req,res,next)=>{
+    const form =formidable({
+        uploadDir:path.join(__dirname,'../uploads/test'),
+        keepExtensions:true
+    })
+    form.parse(req,(err,fields,files)=>{
+        if(err){
+            next(err)
+            return
+        }
+        res.json({fields,files})
+    })
 })
 
 
@@ -107,7 +124,7 @@ router.get('/api/article_count',(req,res,next)=>{
 
 //按照分页获取最新文章（预览内容）
 router.get('/api/new_articles',(req,res,next)=>{
-    connection.query('select title,left(content,5) as pre_content from article limit 8',(err,results,fields)=>{
+    connection.query('select id,title,left(content,49) as pre_content,tag,read_count from article limit '+(req.query.page-1)*8+','+req.query.count,(err,results,fields)=>{
         if(err) return next(err)
         res.json({
             code:0,
@@ -119,7 +136,7 @@ router.get('/api/new_articles',(req,res,next)=>{
 
 //按照分页获取热门文章（预览内容）
 router.get('/api/hot_articles',(req,res,next)=>{
-    connection.query('select title,left(content,5) as pre_content from article order by read_count desc limit 8',(err,results,fields)=>{
+    connection.query('select id,title,left(content,49) as pre_content,tag,read_count from article order by read_count desc limit '+req.query.count,(err,results,fields)=>{
         if(err) return next(err)
         res.json({
             code:0,
@@ -157,7 +174,7 @@ router.get('/api/category_articles_count',(req,res,next)=>{
 //根据分类获取文章（预览内容）
 router.get('/api/category_articles',(req,res,next)=>{
     if(req.query.tag==='all'){
-        connection.query('select title,left(content,5) as pre_content,tag from article limit ?,8',[(req.query.page-1)*8],(err,results,fields)=>{
+        connection.query('select id,title,left(content,49) as pre_content,tag,read_count from article limit '+req.query.count,(err,results,fields)=>{
             if(err) return next(err)
             res.json({
                 code:0,
@@ -167,7 +184,32 @@ router.get('/api/category_articles',(req,res,next)=>{
         })
     }
     else{
-        connection.query('select title,left(content,5) as pre_content,tag from article where tag=? limit ?,8',[req.query.tag,(req.query.page-1)*8],(err,results,fields)=>{
+        connection.query('select id,title,left(content,49) as pre_content,tag,read_count from article where tag=?'+' '+'limit '+req.query.count,[req.query.tag],(err,results,fields)=>{
+            if(err) return next(err)
+            res.json({
+                code:0,
+                data:results,
+                message:'OK'
+            })
+        })
+    }
+})
+
+//根据分类获取分页文章（预览内容）
+router.get('/api/category_articles_by_page',(req,res,next)=>{
+    console.log(req.query.tag,req.query.page,req.query.count);
+    if(req.query.tag==='all'){
+        connection.query('select id,title,left(content,49) as pre_content,tag,read_count from article limit '+(req.query.page-1)*8+','+req.query.count,(err,results,fields)=>{
+            if(err) return next(err)
+            res.json({
+                code:0,
+                data:results,
+                message:'OK'
+            })
+        })
+    }
+    else{
+        connection.query('select id,title,left(content,49) as pre_content,tag,read_count from article where tag='+req.query.tag+' '+'limit '+(req.query.page-1)*req.query.count+','+req.query.count,(err,results,fields)=>{
             if(err) return next(err)
             res.json({
                 code:0,
@@ -193,7 +235,7 @@ router.get('/api/message_count',(req,res,next)=>{
 
 //按照分页获取最新留言
 router.get('/api/new_messages',(req,res,next)=>{
-    connection.query('select content from message order by id limit ?,8',[(req.query.page-1)*8],(err,results,fields)=>{
+    connection.query('select content from message order by id limit '+(req.query.page-1)*8+','+req.query.count,(err,results,fields)=>{
         if(err) return next(err)
         res.json({
             code:0,
@@ -313,7 +355,7 @@ router.post('/api/regist',(req,res,next)=>{
     connection.query('select * from user where user.nickname=?',[req.body.nickname],(err,results,fields)=>{
         if(err) return next(err)
         if(results.length===0){
-            connection.query('insert into user(nickname,password) value(?,?)',[req.body.nickname,md5(req.body.password+S_KEY)],(err,results,fields)=>{
+            connection.query('insert into user(nickname,password,avatar_src) value(?,?,?)',[req.body.nickname,md5(req.body.password+S_KEY),default_avatar_path],(err,results,fields)=>{
                 if(err) return next(err)
                 res.json({
                     code:0,
@@ -354,7 +396,7 @@ router.post('/api/login',(req,res,next)=>{
                         if(err) return next(err)
                         req.session.user_id=results[0].id
                         req.session.nickname=results[0].nickname
-                        req.session.avatar_src='默认路径'
+                        req.session.avatar_src=results[0].avatar_src
                         req.session.profile='这个人太懒了，啥都不想写'
                         res.json({
                             code:0,
@@ -403,7 +445,50 @@ router.get('/api/logout',(req,res,next)=>{
     })
 })
 
+router.post('/api/testupload',(req,res,next)=>{
+    const form =formidable({
+        uploadDir:path.join(__dirname,'../uploads/test'),
+        keepExtensions:true
+    })
+    form.parse(req,(err,fields,files)=>{
+        if(err){
+            next(err)
+            return
+        }
+        res.json({fields,files})
+    })
+})
+
 //上传/修改头像
+router.post('/api/upload_avatar',(req,res,next)=>{
+    const form =formidable({
+        uploadDir:path.join(__dirname,'../uploads/avatar'),
+        keepExtensions:true,
+        allowEmptyFiles:false
+    })
+    form.parse(req,(err,form_fields,files)=>{
+        if(err){
+            next(err)
+            return
+        }
+        if(!files.file){
+            res.json({
+                code:1,
+                message:'上传的图片不能为空'
+            })
+        }
+        connection.query('update user set avatar_src=? where id=?',[avatar_path+files.file.newFilename,form_fields.userId],(err,results,fields)=>{
+            if(err){
+                return next(err)
+            }
+            req.session.avatar_src=avatar_path+files.file.newFilename
+            res.json({
+                code:0,
+                message:'上传头像成功'
+            })
+        })
+    })
+})
 
 //修改个人简介
 2

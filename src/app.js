@@ -22,7 +22,7 @@ app.use(session({                   //为用户设置session
     resave:false,
     saveUninitialized:false,    //saveUninitialized:true是指无论有没有session cookie，每个请求都设置一个session cookie
     store:sessionStore,           //session持久化
-    cookie:{maxAge:8000*60*24}        //表示cookie过期时间
+    cookie:{maxAge:1000*3600*24*3}        //表示cookie过期时间
 }))
 
 //配置body-parser中间件
@@ -30,7 +30,9 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 
 //开发静态资源
-app.use("/public/", express.static(path.join(__dirname, "../public/")));
+//如localhost:3000/avatar/default.jpeg   而不是如localhost:3000/uploads/avatar/default.jpeg 
+app.use(express.static(path.join(__dirname, "../public/")));
+app.use(express.static(path.join(__dirname, "../uploads/")));
 app.use(express.static(path.join(__dirname, "../dist/"), { maxAge: 86400000 }));
 
 //设置允许跨域访问该服务. 
