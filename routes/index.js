@@ -14,6 +14,7 @@ const avatar_path='http://localhost:3000/avatar/'
 // 连接数据库
 const connection =require('../db/db.js');
 const { log } = require('console');
+const { NEWDATE } = require('mysql/lib/protocol/constants/types');
 
 connection.query('SELECT 1 + 1 AS solution', function (error, results, fields) {
     if (error) throw error;
@@ -235,7 +236,7 @@ router.get('/api/message_count',(req,res,next)=>{
 
 //按照分页获取最新留言
 router.get('/api/new_messages',(req,res,next)=>{
-    connection.query('select content from message order by id limit '+(req.query.page-1)*8+','+req.query.count,(err,results,fields)=>{
+    connection.query('select message.*,user.avatar_src from message,user where message.user_id=user.id order by date desc limit '+(req.query.page-1)*8+','+req.query.count,(err,results,fields)=>{
         if(err) return next(err)
         res.json({
             code:0,
@@ -315,8 +316,14 @@ router.get('/api/message_comment',(req,res,next)=>{
 
 //写留言
 router.post('/api/leave_message',(req,res,next)=>{
-    connection.query('insert into message(user_id,content) value(?,?)',[req.body.user_id,req.body.content],(err,results,fields)=>{
-        if(err) return next(err)
+    connection.query('insert into message(nickname,user_id,content,date) value(?,?,?,?)',[req.body.nickname,req.body.userId,req.body.content,new Date()],(err,results,fields)=>{
+        if(err) {
+            res.json({
+                code:1,
+                message:'服务器错误'
+            })
+            return next(err)
+        }
         res.json({
             code:0,
             message:'添加留言成功'
@@ -518,11 +525,11 @@ router.get('/api/article_detail',(req,res,next)=>{
 
 //搜索结果页===============================================================
 //根据关键词请求文章（预览内容）
-router.post('/api/search_article',(req,res,next)=>{
-    connection.query('select * from article where article.content like "%"'+'?'+'"%"',[req.body.keywords],(err,results,fields)=>{
+router.get('/api/search_keyword',(req,res,next)=>{
+    connection.query('select id,title,left(content,49) as pre_content,tag,read_count from article where article.content like "%"'+'?'+'"%"',[req.query.keyword],(err,results,fields)=>{
         if(err) return next(err)
-        console.log(req.body.keywords);
-        console.log(results);
+        // console.log(req.query);
+        // console.log(results);
         res.json({
             code:0,
             data:results,
