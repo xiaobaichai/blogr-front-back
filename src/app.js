@@ -38,7 +38,7 @@ app.use(express.static(path.join(__dirname, "../dist/"), { maxAge: 86400000 }));
 //设置允许跨域访问该服务. 
 app.all("*", function (req, res, next) {
     //允许特定源访问
-    res.header("Access-Control-Allow-Origin", "http://192.168.31.110:8080");
+    res.header("Access-Control-Allow-Origin", "http://localhost:8080");
     //允许跨域请求携带凭证如cookie.SSL认证（同源策略默认不允许携带凭证）
     res.header("Access-Control-Allow-Credentials", "true");
     //允许的跨域请求头部字段

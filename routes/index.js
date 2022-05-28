@@ -125,19 +125,23 @@ router.get('/api/article_count',(req,res,next)=>{
 
 //按照分页获取最新文章（预览内容）
 router.get('/api/new_articles',(req,res,next)=>{
-    connection.query('select id,title,left(content,49) as pre_content,tag,read_count from article limit '+(req.query.page-1)*8+','+req.query.count,(err,results,fields)=>{
+    connection.query('select count(*) as count from article',(err,results,fields)=>{
         if(err) return next(err)
-        res.json({
-            code:0,
-            data:results,
-            message:'OK'
+        let count =results[0].count
+        connection.query('select id,title,content as pre_content,tag,read_count,date from article limit '+(count-(req.query.page)*8<0 ? 0 : count-(req.query.page)*8)+','+(count-(req.query.page)*8<0 ? 8+count-(req.query.page)*8 : req.query.count),(err,results,fields)=>{
+            if(err) return next(err)
+            res.json({
+                code:0,
+                data:results,
+                message:'OK'
+            })
         })
     })
 })
 
 //按照分页获取热门文章（预览内容）
 router.get('/api/hot_articles',(req,res,next)=>{
-    connection.query('select id,title,left(content,49) as pre_content,tag,read_count from article order by read_count desc limit '+req.query.count,(err,results,fields)=>{
+    connection.query('select id,title,left(content,49) as pre_content,tag,read_count,date from article order by read_count desc limit '+req.query.count,(err,results,fields)=>{
         if(err) return next(err)
         res.json({
             code:0,
@@ -175,7 +179,7 @@ router.get('/api/category_articles_count',(req,res,next)=>{
 //根据分类获取文章（预览内容）
 router.get('/api/category_articles',(req,res,next)=>{
     if(req.query.tag==='all'){
-        connection.query('select id,title,left(content,49) as pre_content,tag,read_count from article limit '+req.query.count,(err,results,fields)=>{
+        connection.query('select id,title,content as pre_content,tag,read_count from article limit '+req.query.count,(err,results,fields)=>{
             if(err) return next(err)
             res.json({
                 code:0,
@@ -185,7 +189,7 @@ router.get('/api/category_articles',(req,res,next)=>{
         })
     }
     else{
-        connection.query('select id,title,left(content,49) as pre_content,tag,read_count from article where tag=?'+' '+'limit '+req.query.count,[req.query.tag],(err,results,fields)=>{
+        connection.query('select id,title,content as pre_content,tag,read_count from article where tag=?'+' '+'limit '+req.query.count,[req.query.tag],(err,results,fields)=>{
             if(err) return next(err)
             res.json({
                 code:0,
@@ -198,9 +202,9 @@ router.get('/api/category_articles',(req,res,next)=>{
 
 //根据分类获取分页文章（预览内容）
 router.get('/api/category_articles_by_page',(req,res,next)=>{
-    console.log(req.query.tag,req.query.page,req.query.count);
+    // console.log(req.query.tag,req.query.page,req.query.count);
     if(req.query.tag==='all'){
-        connection.query('select id,title,left(content,49) as pre_content,tag,read_count from article limit '+(req.query.page-1)*8+','+req.query.count,(err,results,fields)=>{
+        connection.query('select id,title,content as pre_content,tag,read_count from article limit '+(req.query.page-1)*8+','+req.query.count,(err,results,fields)=>{
             if(err) return next(err)
             res.json({
                 code:0,
@@ -210,7 +214,7 @@ router.get('/api/category_articles_by_page',(req,res,next)=>{
         })
     }
     else{
-        connection.query('select id,title,left(content,49) as pre_content,tag,read_count from article where tag='+req.query.tag+' '+'limit '+(req.query.page-1)*req.query.count+','+req.query.count,(err,results,fields)=>{
+        connection.query('select id,title,content as pre_content,tag,read_count from article where tag='+req.query.tag+' '+'limit '+(req.query.page-1)*req.query.count+','+req.query.count,(err,results,fields)=>{
             if(err) return next(err)
             res.json({
                 code:0,
@@ -498,11 +502,16 @@ router.post('/api/upload_avatar',(req,res,next)=>{
 })
 
 //修改个人简介
-2
 //文章详情页===============================================================
-router.get('/api/article_detail',(req,res,next)=>{
-    connection.query('select * from article where id=?',[req.query.id],(err,results,fields)=>{
-        if(err) return next(err)
+router.get('/api/getArticle',(req,res,next)=>{
+    connection.query('select title,tag,date,read_count as readCount,content from article where id=?',[req.query.id],(err,results,fields)=>{
+        if(err) {
+            res.json({
+                code:1,
+                message:'服务端错误'
+            })
+            return
+        }
         res.json({
             code:0,
             data:results,
@@ -512,6 +521,22 @@ router.get('/api/article_detail',(req,res,next)=>{
 })
 
 //用户查看文章次数+1
+router.get('/api/updateReadCount',(req,res,next)=>{
+    connection.query('update article set read_count=? where id=?',[Number(req.query.readCount)+1,req.query.id],(err,results,fields)=>{
+        if(err) {
+            res.json({
+                code:1,
+                message:'服务端错误'
+            })
+            return
+        }
+        res.json({
+            code:0,
+            data:results,
+            message:'ok'
+        })
+    })
+})
 
 //用户点赞
 
@@ -526,7 +551,7 @@ router.get('/api/article_detail',(req,res,next)=>{
 //搜索结果页===============================================================
 //根据关键词请求文章（预览内容）
 router.get('/api/search_keyword',(req,res,next)=>{
-    connection.query('select id,title,left(content,49) as pre_content,tag,read_count from article where article.content like "%"'+'?'+'"%"',[req.query.keyword],(err,results,fields)=>{
+    connection.query('select id,title,content as pre_content,tag,read_count,date from article where article.content like "%"'+'?'+'"%"',[req.query.keyword],(err,results,fields)=>{
         if(err) return next(err)
         // console.log(req.query);
         // console.log(results);
